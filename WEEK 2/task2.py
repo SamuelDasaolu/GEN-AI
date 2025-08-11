@@ -34,6 +34,8 @@ sentence = input("Please, enter your sentence: ").lower()
 vowel_list = ['a', 'e', 'i', 'o', 'u']
 vowel_count = sum(1 for letter in sentence if letter in vowel_list)
 print(f"There are {vowel_count} vowels")
+vowel_count = sentence.count('a') + sentence.count('e') + sentence.count('i') + sentence.count('o') + sentence.count('u')
+print(f"There are {vowel_count} vowels")
 
 # Task 10
 string_number = input("Your number to multiply: ")
