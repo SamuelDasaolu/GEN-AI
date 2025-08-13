@@ -17,4 +17,4 @@
 
 profile = input("First Name: "), input("Age: "), input("Favorite Colour: "), input('Home Town: ')
 name, age, fav_colour, home_town = profile
-print(f"Name: {name} \n Age: {age} \n Favorite Colour: {fav_colour} \n Home town: {home_town}")
+print(f" Name: {name} \n Age: {age} \n Favorite Colour: {fav_colour} \n Home town: {home_town}")
