@@ -10,10 +10,10 @@
 - Show remaining seats after each booking.
 """
 
-seats = set()
-seat_generator = range(1, 51)
-for seat in seat_generator: 
-    seats.add(seat)
-    user_seat = int(input("Please book a seat (1-50)"))
-    seats.remove(user_seat)
+seats = set(range(1, 51))
+print(seats)
+
+for seat in range(1,51): 
+    user_seat = int(input("Please book an available seat (1-50): "))
+    seats.discard(user_seat)
     print("Remaining Seats: \n", seats)
