@@ -25,4 +25,3 @@ for key, value in student_profile.items():
     if type(value) is list:
         value = ', '.join(value) #Turns Courses back to string
     print(f'\t {key} : {value} \n')
-    
