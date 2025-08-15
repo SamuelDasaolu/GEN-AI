@@ -13,4 +13,8 @@
   - Use {day: activity for day, activity in `zip(..., ...)`}.
   Tip: Research on how to use `zip()`
 """
-days_tuple = ('monday', 'tuesday', 'wednesday', 'thursday', 'friday')
+days_tuple = ('sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday')
+activities_tuple = ('sunday_act', 'monday_act', 'tuesday_act', 'wednesday_act', 'thursday', 'friday')
+zipped_data = zip(days_tuple, activities_tuple)
+activities_pairing = {day: activity for day, activity in zipped_data}
+print("Weird Way: ", activities_pairing)

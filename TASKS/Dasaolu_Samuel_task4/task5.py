@@ -11,6 +11,20 @@
   - Tips: You are to start by creating two empty lists.
 """
 
-name_list = []
+student_list = []
 score_list = []
 
+names = input("Enter 3 student names(separated by commas): ")
+name_list = names.split(',')
+for name in name_list:
+  formatted_name = name.strip().title()
+  score = int(input(f"Enter score for {formatted_name}: ").strip())
+  student_list.append(formatted_name)
+  score_list.append(score)
+  
+print(f"""
+Student \t\t Score \n
+{student_list[0]} \t\t {score_list[0]}\n
+{student_list[1]} \t\t {score_list[1]}\n
+{student_list[2]} \t\t {score_list[2]}\n
+""")

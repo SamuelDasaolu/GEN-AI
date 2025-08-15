@@ -18,4 +18,4 @@ shopping_list.append(item_4)
 shopping_list.append(item_5)
 shopping_list_tuple = tuple(shopping_list)
 
-print('|'.join(shopping_list_tuple))
+print(' | '.join(shopping_list_tuple))
