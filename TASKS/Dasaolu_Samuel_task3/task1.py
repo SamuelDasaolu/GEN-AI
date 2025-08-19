@@ -25,8 +25,23 @@ print(f"Hello, !".replace('!', user_name))
 # Task 4
 word_to_count = input("Type text to count: ")
 last_character = word_to_count[-1]
-print(f"It contains {word_to_count.rindex(last_character) + 1} characters")
+print(f"It contains {word_to_count.rindex(last_character) + 1} characters \n")
+#OR (using for control loop)
+count = 0
+for ch in word_to_count:
+    count+=1
+print(f"It contains {count} characters (Counted using for loop)\n")
+
 
 # Task 5
 print("Hello World".replace('World', 'Python'))
+#OR using control loop
+sentence = 'Hello World'
+sentence_list = sentence.split(' ')
+count = 0
+for word in sentence_list:
+    if word == 'World':
+        sentence_list[count] = 'Python'
+    count+=1
 
+print(' '.join(sentence_list), 'Using for Control Loop')
