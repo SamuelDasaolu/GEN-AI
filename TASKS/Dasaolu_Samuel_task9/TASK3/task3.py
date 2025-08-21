@@ -11,24 +11,28 @@ Task3: Pattern Matching & Splitting
 15. Check if a given string starts with "https://".
 """
 
-# Task 11
-fruit_string = "apple,banana,orange"
-fruit_list = fruit_string.split(',')
-print(f"Fruit list: {fruit_list}")
-
 # Task 12
+#using Control Loop
 user_sentence = input("Please input a sentence: ")
 sentence_list = user_sentence.split(" ")
-print(' \n'.join(sentence_list))
+for word in sentence_list:
+    print(word, '\n')
 
 # Task 13
+#Using Control Loop
 user_string = input("Input your desired string: ")
-print(user_string.replace(' ', '~'))
+new_string = ''
+for ch in user_string:
+    if ch == ' ':
+        ch = '~'
+    new_string+=ch
+print('New String: ', new_string, '\n')
 
 # Task 14
+#Using Control Loop
 word = "banana"
-print(f"Letter 'A' appears {word.lower().count('a')} times in banana")
-
-# Task 15
-url = input("Please input valid url(https://): ")
-print(url.startswith("https://"))
+count = 0
+for ch in word:
+    if ch == 'a':
+        count+=1
+print(f"Letter 'A' appears {count} times in the word banana")

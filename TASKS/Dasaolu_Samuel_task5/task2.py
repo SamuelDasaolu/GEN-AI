@@ -18,5 +18,4 @@ friends = (bestfriend_1, bestfriend_2, bestfriend_3, bestfriend_4, bestfriend_5)
 reversed_friends_string = ', '.join(reversed(list(friends)))
 reversed_friends_list = reversed_friends_string.split(', ')
 reversed_friends_tuple = tuple(reversed_friends_list)
-
 print(reversed_friends_tuple)
