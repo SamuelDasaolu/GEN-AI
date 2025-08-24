@@ -15,13 +15,19 @@
 
   - Use `print()` formatting with `\n` and `\t` for better output.
 """
-student_profile = {
-    'name' : input('Name: '),
-    'age' : int(input('Age: ')),
-    'gender' : input('Gender: '),
-    'courses' : (input('Courses(separated by commas): ').split(', ')),
-}
-for key, value in student_profile.items():
-    if type(value) is list:
-        value = ', '.join(value) #Turns Courses back to string
-    print(f'\t {key} : {value} \n')
+try:
+    student_profile = {
+        'name' : input('Name: '),
+        'age' : int(input('Age: ')),
+        'gender' : input('Gender: '),
+        'courses' : (input('Courses(separated by commas): ').split(', ')),
+    }
+
+    for key, value in student_profile.items():
+        if type(value) is list:
+            value = ', '.join(value)  # Turns Courses back to string
+        print(f'\t {key} : {value} \n')
+
+except ValueError:
+    print("Age nust be an integer to proceed")
+
