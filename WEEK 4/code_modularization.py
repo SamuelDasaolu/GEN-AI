@@ -202,6 +202,7 @@
 #Used in nested functions when you want to modify the variable from the enclosing scope (not global).
 
 def outer():
+    """Describes the behaviour of namespaces"""
     x = "outer x"
     
     def inner():
