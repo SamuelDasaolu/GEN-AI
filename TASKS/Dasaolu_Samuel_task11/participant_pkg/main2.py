@@ -44,6 +44,10 @@ while True:
                 0********* or +*************
                 """)
         print("Phone Number cannot be Empty")
+    
+    #Track Collection and Validation    
+    while True:
+        break
         
     print('Outside the loop')
     break
