@@ -10,28 +10,30 @@ allow for multiple participants
 """
 
 from pathlib import Path
+import file_ops as op
 
 
-def ask_user(detail, message = ''):
+def ask_user(detail, message=''):
     return input(f"Participant {detail} ({message if message else ''}): ")
 
-while True: 
+
+while True:
     # Name Collection and Validation
     while True:
         name = input("Enter Participant Name: ").title()
         if name.strip() and len(name.strip().split()) == 2:
             break
         print('Name cannot be empty and must be of format: FirstName LastName e.g John Smith')
-        
-        
-    #Age Collection and Validation    
-    while True: 
+
+    # Age Collection and Validation
+    while True:
         age = input("Enter Participant Age: ")
         if age and age.isdigit():
+            age = int(age)
             break
         print("Age cannot be empty and must be a Whole Number")
-        
-    #Phone Number Collection and Validation:
+
+    # Phone Number Collection and Validation:
     while True:
         phone_number = input("Enter Phone Number: ")
         if phone_number:
@@ -44,10 +46,24 @@ while True:
                 0********* or +*************
                 """)
         print("Phone Number cannot be Empty")
-    
-    #Track Collection and Validation    
+
+    # Track Collection and Validation
     while True:
-        break
-        
+        track = input("Enter Participant Track: ")
+        if track.strip():
+            break
+        print("Track cannot be empty")
+    test_data = {
+        'name': name,
+        'age': age,
+        'phone_number': phone_number,
+        'track': track,
+    }
+    # Save and Read Participant Data
+    workspace_path = Path("WORKSPACE_FILES")
+    workspace_path.mkdir(exist_ok=True)
+    file_path = workspace_path / 'contacts.csv'
+    op.save_participant(file_path, test_data)
+
     print('Outside the loop')
     break

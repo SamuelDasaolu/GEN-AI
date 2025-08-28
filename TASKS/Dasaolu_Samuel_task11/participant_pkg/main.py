@@ -5,7 +5,7 @@ Validate Inputs (Phone by length, non-empty etc)
 handling Errors (reprompt if error)
 
 details = {name, age, phone, track}
-allow for multiple participants
+allow for multiple participants etc
 
 """
 
