@@ -41,6 +41,7 @@ data = {
 
     },
 }
+name = 'samuel'
 
 workspace = Path("WORKSPACE_FILES")
 workspace.mkdir(exist_ok=True)
@@ -49,6 +50,7 @@ file_path = workspace / 'todolist.json'
 
 def add_task(task: str):
     """Collects Task Information and Adds to To-do List"""
+    global data
 
     if not file_path.exists():
         length = len(data['ongoing_tasks'])
@@ -69,9 +71,25 @@ def add_task(task: str):
 
 
 def remove_task(task):
-    if task in list(todo.values()):
-        todo.pop
+    with open(file_path, 'r', encoding='utf-8') as save_file:
+        contents: dict = json.load(save_file)
+    if task in contents['ongoing_tasks'].values():
+        # Delete Task
+        # Rewrite dictionaries to truncate key indexes
+        ongoing_tasks: dict = contents['ongoing_tasks']
+        returned_objects = {}
+        count = 0
+        for index, (key, value) in enumerate(ongoing_tasks.items()):
+            if value != task:
+                if index == count:
+                    returned_objects[key] = value
+                else:
+                    returned_objects[f"TASK {index-1}"] = value
+            if value == task:
+                continue
+
         print(f"Task ({task}) removed successfully")
+        print(returned_objects)
     else:
         print("Task not found")
 
