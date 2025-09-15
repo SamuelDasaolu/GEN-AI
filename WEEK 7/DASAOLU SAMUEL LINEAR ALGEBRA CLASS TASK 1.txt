@@ -1,0 +1,16 @@
+CLASS TASK 1
+
+DASAOLU SAMUEL 
+LINEAR ALGEBRA
+
+a. List and explain 3 other examples of vectors(2 real world use cases, and 1 abstract case)
+i. Object Representation/Modelling in Engineering Softwares: Vectors are used to describe how the surfaces of objects should be displayed and determining how they interact with other objects
+ii. Displacement: Vectors are used to represent a change in the position of an object in a certain direction
+iii. Abstract Cases: Vectors in a coordinate system: Vectors are used to represent an object or even a point in space or in a coordinate system. Vectors describe the position, orientation, rotation and other properties of the object
+
+b. Give any intuitive idea on why it is important to study the concept of vectors in Machine Learning
+Vectors are used to breakdown the properties of any data being worked on into it's key characteristics.  For example, a building represented by a vector like [2000 feet, 3, 'obantoko'] can describe the building's size, number of floors, etc. In as much as any object's details can be broken down into numbers, vector manipulation is needed to work with the data and translate it into useful features as needed.
+
+c. Give two examples of polynomials as a vector
+i. The polynomial q(x) = 4x^2 + 3x + 9 can be written as vector [4, 3, 9] by taking it's coefficients
+ii. Polynomial q(x) = 5x^3 + 4x^2 + 8x + 10 can be represented by [5, 4, 8, 10]
