@@ -1,0 +1,12 @@
+Examples of Times I Used Data to Make a Decision
+
+1. Smart Water Purification System Project
+In my Smart Water Purification System project, I collected data from multiple sensors, including pH, turbidity, Total Dissolved Solids (TDS), temperature, flow, and pressure sensors. The system used this real-time data to make decisions about water purification. For instance, when the turbidity and TDS readings exceeded safe thresholds, the system automatically activated the DC pump and solenoid valve to begin purification, and powered the UV lamps to ensure safe water quality. This shows how I used data-driven logic to decide when purification actions should occur.
+
+2. Automobile Diagnosis and Repair
+During my time at Automedics Limited, I relied on diagnostic data to guide repair decisions. For example:
+- While replacing a torque converter on a Honda Pilot, the diagnostic data helped reveal wear on the shaft, which eventually broke due to excessive use. That data-informed observation guided the repair approach.
+- In a transmission service for a Toyota Highlander, fluid condition and pressure readings were used to determine the extent of servicing required.
+- When replacing a damaged clutch disk on a Toyota Hilux, inspection and wear measurements provided the data that confirmed the need for replacement.
+
+In all these cases, objective data—whether sensor readings, physical measurements, or diagnostic outputs—was the foundation for making informed decisions.
