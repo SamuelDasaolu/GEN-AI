@@ -25,7 +25,7 @@ def run():
 
 
 
-print("Application is running")
+print("Get Application is running")
 
 
 run()
