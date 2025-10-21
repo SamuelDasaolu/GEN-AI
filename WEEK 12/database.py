@@ -11,8 +11,6 @@ DB_PASSWORD = os.getenv("DB_PASSWORD")
 DB_HOST = os.getenv("DB_HOST")
 DB_NAME = os.getenv("DB_NAME")
 DB_PORT = os.getenv("DB_PORT")
-# print(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME, DB_PORT)
-#
 db_url = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 print(f"db_url : {db_url}")
 
@@ -20,6 +18,43 @@ engine = create_engine(db_url)
 Session = sessionmaker(bind=engine)
 db_session = Session()
 
-query = text("SELECT * FROM users")
-users = db_session.execute(query).fetchall()
+create_table_query = text('''
+CREATE TABLE IF NOT EXISTS users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(255) NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL
+    ); ''')
+
+create_courses_query = text('''
+    CREATE TABLE IF NOT EXISTS courses  (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(255) NOT NULL,
+    level VARCHAR(255) NOT NULL
+    ); ''')
+
+create_enrollment_query = text('''
+    CREATE TABLE IF NOT EXISTS enrollments (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    userId INT NOT NULL,
+    courseId INT NOT NULL,
+    FOREIGN KEY (userId) REFERENCES users (id),
+    FOREIGN KEY (courseId) REFERENCES courses (id)
+    ); ''')
+
+try:
+    db_session.execute(create_table_query)
+    db_session.execute(create_courses_query)
+    db_session.execute(create_enrollment_query)
+
+    db_session.commit()
+    print("All Tables created successfully")
+except Exception as e:
+    db_session.rollback()
+    print(f"Something went wrong: {e}")
+
+finally:
+    db_session.close()
+
+users = db_session.execute(create_table_query)
 print(users)
