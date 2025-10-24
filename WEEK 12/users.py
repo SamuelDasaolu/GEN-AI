@@ -16,12 +16,18 @@ class User(BaseModel):
     name: str = Field(examples=['Samuel'])
     password: str = Field()
     email: str = Field(examples=['name@domain.com'])
+    userType: Optional[Literal["student", "teacher", "admin"]] = Field(default="student", examples=['student'])
 
 
 class UserUpdate(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     password: Optional[str] = None
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., examples=["name@domain.com"])
+    password: str = Field(..., examples=["password123"])
 
 
 class Course(BaseModel):
@@ -73,11 +79,14 @@ def create_user(user: User):
             raise HTTPException(status_code=400, detail="Email already registered")
 
         query = text("INSERT INTO users (name, password, email) VALUES (:name, :password, :email)")
-
+        if user.userType != "student":
+            query = text(
+                "INSERT INTO users (name, password, email, userType) VALUES (:name, :password, :email, :userType)")
         salt = bcrypt.gensalt()
         hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), salt)
 
-        db_session.execute(query, {"name": user.name, "password": hashed_password, "email": user.email})
+        db_session.execute(query, {"name": user.name, "password": hashed_password, "email": user.email,
+                                   "userType": user.userType})
         db_session.commit()
         return {"Message": "User Created Successfully", "data": user.model_dump()}
     except Exception as e:
@@ -85,6 +94,23 @@ def create_user(user: User):
         return {"Message": "An error occurred while creating User", "Error": str(e)}
     finally:
         db_session.close()
+
+
+@app.post("/users/login")
+def login_user(user: LoginRequest):
+    try:
+        query = text("SELECT * FROM users WHERE email = :email")
+        db_user = db_session.execute(query, {"email": user.email}).fetchone()
+        if db_user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+        if not bcrypt.checkpw(user.password.encode('utf-8'), db_user.password):
+            raise HTTPException(status_code=404, detail="Incorrect password")
+
+        return {"Message": "Login Successful", "data": db_user.model_dump()}
+
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.patch("/users/update/{user_id}")
