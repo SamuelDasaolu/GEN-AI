@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Final Report: Exploratory Data Analysis of the Home Loan Dataset</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+    }
+    h1 {
+        color: #333;
+    }
+    h2 {
+        color: #555;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 5px;
+    }
+    h3 {
+        color: #666;
+    }
+    ul {
+        margin-top: 0;
+        padding-left: 20px;
+    }
+    li {
+        margin-bottom: 10px;
+    }
+</style>
+</head>
+<body>
+
+<h1>Final Report: Exploratory Data Analysis of the Home Loan Dataset</h1>
+<p><strong>Project:</strong> Home Loan Dataset EDA</p>
+<p><strong>Date:</strong> 03/11/25</p>
+<p><strong>Author:</strong> Dasaolu Samuel</p>
+
+<hr>
+
+<h2>1. Project Overview and Objective</h2>
+<p>The objective of this project was to conduct a comprehensive Exploratory Data Analysis (EDA) on the Home Loan dataset. The primary goal was to understand the underlying structure of the data, identify patterns, and find key relationships that influence loan approval status. This analysis is essential for uncovering insights that can support subsequent predictive modeling and strategic decision-making in home loan processing.</p>
+
+<hr>
+
+<h2>2. Methodology (The EDA Process)</h2>
+
+<h3>Phase 1: Data Collection and Preparation</h3>
+<ul>
+    <li><strong>Loaded Data:</strong> The <code>home_loan_train.csv</code> and <code>home_loan_test.csv</code> datasets were loaded into pandas DataFrames.</li>
+    <li><strong>Inspected Data:</strong> The training data was inspected, revealing missing values in <code>Gender</code>, <code>Married</code>, <code>Dependents</code>, <code>Self_Employed</code>, <code>LoanAmount</code>, <code>Loan_Amount_Term</code>, and <code>Credit_History</code>. It also revealed a non-numeric <code>Dependents</code> column (due to '3+').</li>
+    <li><strong>Data Cleaning:</strong>
+        <ul>
+            <li><strong>Categorical Imputation:</strong> Missing values for all categorical columns (including <code>Credit_History</code>) were filled using the <strong>mode</strong> (most frequent value).</li>
+            <li><strong>Numerical Imputation:</strong> Missing <code>LoanAmount</code> was filled with the <strong>median</strong> (to resist outlier skew) and <code>Loan_Amount_Term</code> was filled with the <strong>mode</strong>.</li>
+            <li><strong>Inconsistency Correction:</strong> The <code>Dependents</code> column was cleaned by replacing '3+' with '3' and converting the column to a numeric data type.</li>
+        </ul>
+    </li>
+</ul>
+
+<h3>Phase 2: Exploratory Data Analysis</h3>
+<ul>
+    <li><strong>Descriptive Analysis:</strong> We analyzed the distributions of all numerical and categorical features.
+        <ul>
+            <li><strong>Numerical:</strong> <code>ApplicantIncome</code>, <code>CoapplicantIncome</code>, and <code>LoanAmount</code> were all found to be <strong>heavily right-skewed</strong> with significant outliers.</li>
+            <li><strong>Categorical:</strong> <code>Credit_History</code> (1.0) was the dominant class (85%), as were <code>Male</code> (81%), <code>Married</code> (65%), and <code>Graduate</code> (78%). <code>Property_Area</code> was well-distributed, with <code>Semiurban</code> being the most common.</li>
+        </ul>
+    </li>
+    <li><strong>Relationship Analysis:</strong> We examined the relationship between each feature and the target variable, <code>Loan_Status</code>, using three methods:
+        <ol>
+            <li><strong>Cross-tabulations:</strong> Used for categorical features, most notably showing the powerful link between <code>Credit_History</code> and <code>Loan_Status</code>.</li>
+            <li><strong>Scatter Plots:</strong> Used for numerical features (e.g., <code>Total_Income</code> vs. <code>LoanAmount</code>), which showed no clear linear separation between approved and rejected loans.</li>
+            <li><strong>Correlation Matrix:</strong> This numerically confirmed the strong positive correlation (<strong>0.54</strong>) between <code>Credit_History</code> and <code>Loan_Status</code> and the weak correlation for all other numerical features.</li>
+        </ol>
+    </li>
+</ul>
+
+<hr>
+
+<h2>3. Key Findings and Insights</h2>
+<ul>
+    <li><strong>Finding 1: Credit History is the Most Dominant Predictor.</strong>
+        <p>This is the most significant finding. Our cross-tabulation revealed that applicants with a good credit history (1.0) were <strong>approved 79%</strong> of the time. Conversely, applicants with a bad credit history (0.0) were <strong>rejected 92%</strong> of the time. This suggests a good credit history is a near-mandatory prerequisite for loan approval.</p>
+    </li>
+    <li><strong>Finding 2: Property Area is a Strong Secondary Predictor.</strong>
+        <p>The location of the property is a key factor. Applicants from <code>Semiurban</code> areas have the highest approval rate, followed by <code>Urban</code> areas. <code>Rural</code> areas have the lowest approval rate.</p>
+    </li>
+    <li><strong>Finding 3: Marital Status Shows a Clear Trend.</strong>
+        <p>Married applicants have a noticeably higher approval rate than non-married applicants.</p>
+    </li>
+    <li><strong>Finding 4: Income/Loan Amount is Not a Simple Differentiator.</strong>
+        <p>A key finding was the <em>lack</em> of a simple, direct relationship between income (or loan amount) and approval. Our scatter plots showed that approved and rejected loans exist at all income levels. This implies that while income is part of the equation, it is not a simple "high income = approval" rule and is likely evaluated <em>in combination</em> with other factors (like <code>Credit_History</code>).</p>
+    </li>
+</ul>
+
+<hr>
+
+<h2>4. Recommendations for Next Steps (Predictive Modeling)</h2>
+
+<ol>
+    <li><strong>Feature Engineering:</strong>
+        <ul>
+            <li><strong>Handle Skewness:</strong> The income and loan amount features are extremely skewed. A <strong>log transform</strong> should be applied to <code>ApplicantIncome</code>, <code>CoapplicantIncome</code>, and <code>LoanAmount</code> to normalize their distributions, which will benefit most models.</li>
+            <li><strong>Create New Features:</strong> Consider creating a <code>Total_Income</code> feature (<code>ApplicantIncome</code> + <code>CoapplicantIncome</code>) and a <code>Debt_to_Income_Ratio</code> feature (<code>LoanAmount</code> / <code>Total_Income</code>) as these may be more predictive.</li>
+        </ul>
+    </li>
+    <li><strong>Modeling Strategy:</strong>
+        <ul>
+            <li><strong>Handle Imbalance:</strong> The target variable <code>Loan_Status</code> is imbalanced (69% 'Y' vs. 31% 'N'). Techniques such as <strong>SMOTE</strong> (oversampling the 'N' class) or using a model with a <code>class_weight='balanced'</code> parameter will be necessary to prevent the model from just predicting 'Y'.</li>
+            <li><strong>Prioritize Features:</strong> <code>Credit_History</code> and <code>Property_Area</code> should be considered high-importance features in any model.</li>
+        </ul>
+    </li>
+</ol>
+
+</body>
+</html>
