@@ -7,9 +7,9 @@ from typing import List
 
 # --- 1. Load Model, Scaler, and Feature List ---
 try:
-    model = joblib.load('easy_visa_model.joblib')
-    scaler = joblib.load('easy_visa_scaler.joblib')
-    model_features = joblib.load('easy_visa_features.joblib')
+    model = joblib.load('easy_visa_model.pkl')
+    scaler = joblib.load('easy_visa_scaler.pkl')
+    model_features = joblib.load('easy_visa_features.pkl')
 except FileNotFoundError:
     print("--- FATAL ERROR ---")
     print("Model/scaler/feature files not found.") # Run final Cell of Notebook to Create them first
