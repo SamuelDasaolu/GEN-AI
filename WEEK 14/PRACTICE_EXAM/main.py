@@ -3,173 +3,157 @@ import joblib
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
+from typing import List
 
-# --- 1. Initialize FastAPI App ---
-app = FastAPI(
-    title="Easy Visa Prediction API",
-    description="An API to predict visa certification status based on application details.",
-    version="1.0"
-)
-
-# --- 2. Load Model, Scaler, and Features ---
-# These files MUST be in the same directory as this script.
+# --- 1. Load Model, Scaler, and Feature List ---
 try:
     model = joblib.load('easy_visa_model.joblib')
     scaler = joblib.load('easy_visa_scaler.joblib')
-    # Load the exact feature names the model was trained on
     model_features = joblib.load('easy_visa_features.joblib')
-except Exception as e:
-    print(f"Error loading model/scaler: {e}")
-    print(
-        "Please make sure 'easy_visa_model.joblib', 'easy_visa_scaler.joblib', and 'easy_visa_features.joblib' are in the same directory.")
-    model, scaler, model_features = None, None, []
+except FileNotFoundError:
+    print("--- FATAL ERROR ---")
+    print("Model/scaler/feature files not found.") # Run final Cell of Notebook to Create them first
+    exit()
+
+# --- 2. Define API and Input/Output Schemas ---
+app = FastAPI(
+    title="Easy Visa Prediction API",
+    description="Predicts visa certification status (Certified/Denied)."
+)
 
 
-# --- 3. Define Input Schema (Pydantic Model) ---
-# This defines the data structure for the API request.
-# We use the ORIGINAL features, before preprocessing.
 class VisaApplication(BaseModel):
+    """Defines the raw input from the user."""
     continent: str
     education_of_employee: str
-    has_job_experience: str  # 'Y' or 'N'
-    requires_job_training: str  # 'Y' or 'N'
+    has_job_experience: str
+    requires_job_training: str
     no_of_employees: int
     yr_of_estab: int
     region_of_employment: str
     prevailing_wage: float
-    unit_of_wage: str  # 'Hour', 'Week', 'Month', 'Year'
-    full_time_position: str  # 'Y' or 'N'
+    unit_of_wage: str
+    full_time_position: str
 
-    # Example for testing in the /docs UI
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "continent": "Asia",
                 "education_of_employee": "Master's",
                 "has_job_experience": "Y",
                 "requires_job_training": "N",
-                "no_of_employees": 2412,
-                "yr_of_estab": 2002,
-                "region_of_employment": "Northeast",
-                "prevailing_wage": 83425.65,
-                "unit_of_wage": "Year",
+                "no_of_employees": 14513,
+                "yr_of_estab": 2007,
+                "region_of_employment": "West",
+                "prevailing_wage": 592.2029,
+                "unit_of_wage": "Hour",
                 "full_time_position": "Y"
             }
         }
 
 
-# --- 4. Preprocessing Function ---
-def preprocess_input(data: VisaApplication) -> pd.DataFrame:
+class PredictionResponse(BaseModel):
+    """Defines the API's JSON response."""
+    prediction: str
+    confidence: str
+    probabilities: dict
+
+
+# --- 3. Helper and Preprocessing Functions ---
+
+def _calculate_annual_wage(wage: float, unit: str) -> float:
+    """Pure function to convert any wage to an annual wage."""
+    if unit == 'Year':
+        return wage
+    if unit == 'Month':
+        return wage * 12
+    if unit == 'Week':
+        return wage * 52
+    if unit == 'Hour':
+        return wage * 40 * 52  # Assuming 40-hour week
+    return wage
+
+
+def preprocess_input(data: VisaApplication, model_cols: List[str]) -> pd.DataFrame:
     """
-    Transforms the raw input from the API into the
-    18-feature, scaled format the model expects.
+    Takes raw VisaApplication data and returns a single-row,
+    scaled DataFrame ready for the model.
     """
-
-    # --- Feature Engineering (Task 3.1) ---
-
-    # 1. Create Annual Wage
-    annual_wage = 0
-    if data.unit_of_wage == 'Year':
-        annual_wage = data.prevailing_wage
-    elif data.unit_of_wage == 'Month':
-        annual_wage = data.prevailing_wage * 12
-    elif data.unit_of_wage == 'Week':
-        annual_wage = data.prevailing_wage * 52
-    elif data.unit_of_wage == 'Hour':
-        annual_wage = data.prevailing_wage * 40 * 52
-
-    # 2. Create Company Age
-    # Assuming 2016 as the reference year from the project
-    company_age = 2016 - data.yr_of_estab
-
-    # --- Encoding (Task 3.2) ---
-
-    # 1. Create a dictionary for the raw data
-    input_dict = {
+    # 1. Create a dictionary for the engineered/mapped features
+    feature_dict = {
         'has_job_experience': 1 if data.has_job_experience == 'Y' else 0,
-        'requires_job_training': 1 if data.requires_job_training == 'N' else 0,
-        'no_of_employees': data.no_of_employees,
+        'requires_job_training': 1 if data.requires_job_training == 'Y' else 0,
         'full_time_position': 1 if data.full_time_position == 'Y' else 0,
-        'annual_wage': annual_wage,
-        'company_age': company_age
+        'no_of_employees': data.no_of_employees,
+        'annual_wage': _calculate_annual_wage(data.prevailing_wage, data.unit_of_wage),
+        'company_age': 2016 - data.yr_of_estab  # Using 2016 as reference year
     }
 
-    # 2. Create DataFrame for one-hot encoding
-    # We create a new DataFrame with the model's features, all set to 0
-    processed_df = pd.DataFrame(columns=model_features)
-    processed_df.loc[0] = 0  # Initialize the first row with zeros
+    # 2. Initialize the feature-ready DataFrame
+    # This creates a DataFrame with one row of zeros
+    # and all the exact columns the model expects.
+    api_df = pd.DataFrame(columns=model_cols)
+    api_df.loc[0] = 0
 
-    # 3. Fill in the non-one-hot-encoded values
-    for col, value in input_dict.items():
-        if col in processed_df.columns:
-            processed_df.at[0, col] = value
+    # 3. Fill in the values from our dictionary
+    for col, value in feature_dict.items():
+        if col in api_df.columns:
+            api_df.at[0, col] = value
 
-    # 4. Manually set the one-hot-encoded dummy variables
-    # This is safer than pd.get_dummies on a single row
+    # 4. Handle the one-hot encoded features
+    # This is a robust way to set the right dummy variable to 1
+    ohe_prefixes = ['continent_', 'education_of_employee_', 'region_of_employment_']
+    user_inputs = [data.continent, data.education_of_employee, data.region_of_employment]
 
-    # Continent
-    continent_col = f"continent_{data.continent}"
-    if continent_col in processed_df.columns:
-        processed_df.at[0, continent_col] = 1
+    for prefix, user_input in zip(ohe_prefixes, user_inputs):
+        col_name = f"{prefix}{user_input}"
+        if col_name in api_df.columns:
+            api_df.at[0, col_name] = 1
 
-    # Education
-    edu_col = f"education_of_employee_{data.education_of_employee}"
-    if edu_col in processed_df.columns:
-        processed_df.at[0, edu_col] = 1
+    # 5. Scale the numerical features
+    numerical_cols = ['no_of_employees', 'company_age', 'annual_wage']
+    api_df[numerical_cols] = scaler.transform(api_df[numerical_cols])
 
-    # Region
-    region_col = f"region_of_employment_{data.region_of_employment}"
-    if region_col in processed_df.columns:
-        processed_df.at[0, region_col] = 1
-
-    # --- Scaling (Task 3.3) ---
-    numerical_features = ['no_of_employees', 'company_age', 'annual_wage']
-
-    # Use the loaded scaler to transform the numerical features
-    processed_df[numerical_features] = scaler.transform(processed_df[numerical_features])
-
-    return processed_df
+    # Ensure column order matches the model's training
+    return api_df[model_cols]
 
 
-# --- 5. Prediction Endpoint ---
-@app.post("/predict")
-async def predict_visa_status(application: VisaApplication):
+# --- 4. API Endpoints ---
+
+@app.get("/")
+def read_root():
+    """Root endpoint with a welcome message."""
+    return {"message": "Welcome to the Easy Visa Prediction API. Go to /docs to test."}
+
+
+@app.post("/predict", response_model=PredictionResponse)
+def predict_visa(application: VisaApplication):
     """
-    Predicts visa certification status.
-    - **Input**: A JSON object with applicant and employer details.
-    - **Output**: A JSON object with the prediction ('Certified' or 'Denied')
-                 and the confidence probability.
+    Takes application data and returns a Certified/Denied prediction.
     """
-    if not all([model, scaler, model_features]):
-        return {"error": "Model or scaler not loaded. Check server logs."}
+    # 1. Preprocess the raw input
+    processed_df = preprocess_input(application, model_features)
 
-    # 1. Preprocess the incoming data
-    processed_data = preprocess_input(application)
-
-    # 2. Make prediction
-    prediction = model.predict(processed_data)[0]  # [0] to get the value
-    probabilities = model.predict_proba(processed_data)[0]  # [0] to get probs
+    # 2. Make prediction and get probabilities
+    prediction = model.predict(processed_df)[0]
+    probabilities = model.predict_proba(processed_df)[0]
 
     # 3. Format the response
     status = "Certified" if prediction == 1 else "Denied"
-    confidence = probabilities[prediction]  # Probability of the predicted class
+    confidence = probabilities[prediction]
 
     return {
         "prediction": status,
         "confidence": f"{confidence:.2%}",
-        "class_probabilities": {
+        "probabilities": {
             "Denied": f"{probabilities[0]:.2%}",
             "Certified": f"{probabilities[1]:.2%}"
         }
     }
 
 
-# --- 6. Root Endpoint ---
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the Easy Visa Prediction API. Go to /docs to see the features."}
-
-
-# --- 7. Run the App ---
+# --- 5. Run the App ---
 if __name__ == "__main__":
+    # You would run this from your terminal with:
+    # uvicorn main:app --reload
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
