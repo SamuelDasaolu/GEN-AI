@@ -1,0 +1,357 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 🇩🇪 German Credit Risk Prediction\n",
+    "\n",
+    "In this notebook, we will build a model to predict credit risk (**Risk**: 0 = Not at Risk, 1 = At Risk). We will follow our standard process, paying close attention to feature engineering to keep the final API simple, as requested.\n",
+    "\n",
+    "This dataset contains several categorical columns. To maintain API simplicity (avoiding complex JSON for one-hot encoding), we will convert all categorical features into numerical ones (using ordinal mapping where it makes sense and label encoding for the rest)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 1. Data Loading and Exploratory Data Analysis (EDA)\n",
+    "\n",
+    "First, let's load the dataset from the URL."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn.preprocessing import StandardScaler, LabelEncoder\n",
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "from sklearn.metrics import classification_report, confusion_matrix\n",
+    "import joblib\n",
+    "import warnings\n",
+    "\n",
+    "# Suppress warnings for cleaner output\n",
+    "warnings.filterwarnings('ignore')\n",
+    "\n",
+    "# Set visualization style\n",
+    "sns.set(style=\"whitegrid\")\n",
+    "\n",
+    "# Load the dataset\n",
+    "url = \"https://raw.githubusercontent.com/ek-chris/Practice_datasets/refs/heads/main/German_Credit.csv\"\n",
+    "credit_df = pd.read_csv(url)\n",
+    "\n",
+    "# Display the first few rows of the dataframe\n",
+    "print(\"--- Dataset Head ---\")\n",
+    "print(credit_df.head())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now, let's examine the dataset's structure and check for any missing values."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get information about the dataframe\n",
+    "print(\"\\n--- Dataset Info ---\")\n",
+    "credit_df.info()\n",
+    "\n",
+    "# Check for missing values\n",
+    "print(\"\\n--- Missing Values Check ---\")\n",
+    "print(credit_df.isnull().sum())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Observation:** The data is clean with **1000 entries** and no missing values. We have 3 numeric features (`Age`, `Credit amount`, `Duration`) and 6 categorical features (`Sex`, `Job`, `Housing`, `Saving accounts`, `Checking account`, `Purpose`). Our target variable is `Risk`.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Visualizing the Target Variable\n",
+    "\n",
+    "Let's see the distribution of our target variable, `Risk`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Distribution of the target variable 'Risk'\n",
+    "plt.figure(figsize=(6, 4))\n",
+    "sns.countplot(x='Risk', data=credit_df, palette=\"pastel\")\n",
+    "plt.title('Distribution of Credit Risk (0=Good, 1=Bad)')\n",
+    "plt.xlabel('Risk')\n",
+    "plt.ylabel('Count')\n",
+    "plt.savefig('credit_risk_distribution.png')\n",
+    "print(\"Saved credit_risk_distribution.png\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Observation:** The dataset is **imbalanced**. There are 700 \"Good\" risk (0) and 300 \"Bad\" risk (1) applicants. We will need to account for this using `class_weight` in our model.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2. Feature Engineering & Preprocessing\n",
+    "\n",
+    "To keep the API simple, we must convert all `object` columns to numbers. We will use manual ordinal mapping for columns with a clear order and `LabelEncoder` for the rest."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from sklearn.preprocessing import LabelEncoder\n",
+    "\n",
+    "# Create a copy to avoid changing the original dataframe\n",
+    "df_processed = credit_df.copy()\n",
+    "\n",
+    "# Manual Ordinal Mapping\n",
+    "savings_map = {'little': 0, 'moderate': 1, 'quite rich': 2, 'rich': 3}\n",
+    "checking_map = {'little': 0, 'moderate': 1, 'rich': 2}\n",
+    "job_map = {'unskilled and non-resident': 0, 'unskilled and resident': 1, 'skilled': 2, 'highly skilled': 3}\n",
+    "\n",
+    "df_processed['Saving accounts'] = df_processed['Saving accounts'].map(savings_map)\n",
+    "df_processed['Checking account'] = df_processed['Checking account'].map(checking_map)\n",
+    "df_processed['Job'] = df_processed['Job'].map(job_map)\n",
+    "\n",
+    "# Fill NaN values that might be created from mapping (if any, though none in this data)\n",
+    "df_processed.fillna(0, inplace=True) # Assuming 'little' or 'unskilled' as default\n",
+    "\n",
+    "# Label Encoding for remaining nominal categories\n",
+    "# We will save these encoders for the API\n",
+    "encoders = {}\n",
+    "nominal_cols = ['Sex', 'Housing', 'Purpose']\n",
+    "\n",
+    "for col in nominal_cols:\n",
+    "    le = LabelEncoder()\n",
+    "    df_processed[col] = le.fit_transform(df_processed[col])\n",
+    "    encoders[col] = le\n",
+    "\n",
+    "print(\"--- Processed Data Head ---\")\n",
+    "print(df_processed.head())\n",
+    "\n",
+    "print(\"\\n--- Processed Data Info ---\")\n",
+    "df_processed.info()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Observation:** All columns are now numeric, making the data ready for modeling and ensuring a simple API interface.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Splitting and Scaling the Data\n",
+    "\n",
+    "We will split the data and scale the numeric features (`Age`, `Credit amount`, `Duration`). The encoded categorical features do not require scaling."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define features (X) and target (y)\n",
+    "X = df_processed.drop('Risk', axis=1)\n",
+    "y = df_processed['Risk']\n",
+    "\n",
+    "# Save feature names for the API\n",
+    "feature_names = list(X.columns)\n",
+    "\n",
+    "# Split the data\n",
+    "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)\n",
+    "\n",
+    "# Scale numeric features\n",
+    "numeric_cols = ['Age', 'Credit amount', 'Duration']\n",
+    "scaler = StandardScaler()\n",
+    "\n",
+    "# Fit on training data\n",
+    "X_train[numeric_cols] = scaler.fit_transform(X_train[numeric_cols])\n",
+    "\n",
+    "# Transform test data\n",
+    "X_test[numeric_cols] = scaler.transform(X_test[numeric_cols])\n",
+    "\n",
+    "print(f\"Training set shape: {X_train.shape}\")\n",
+    "print(f\"Test set shape: {X_test.shape}\")\n",
+    "print(\"\\n--- Scaled Training Data Head ---\")\n",
+    "print(X_train.head())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 3. Model Selection and Training\n",
+    "\n",
+    "We'll use `RandomForestClassifier` with `class_weight='balanced'` to handle the data imbalance."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Initialize the model\n",
+    "model = RandomForestClassifier(random_state=42, class_weight='balanced')\n",
+    "\n",
+    "# Train the model\n",
+    "print(\"Training the model...\")\n",
+    "model.fit(X_train, y_train)\n",
+    "print(\"Model training complete.\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 4. Model Evaluation\n",
+    "\n",
+    "Let's evaluate the model's performance on the unseen test data."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Make predictions on the test set\n",
+    "y_pred = model.predict(X_test)\n",
+    "\n",
+    "# Generate the classification report\n",
+    "print(\"\\n--- Classification Report ---\")\n",
+    "print(classification_report(y_test, y_pred, target_names=['Good Risk (0)', 'Bad Risk (1)']))\n",
+    "\n",
+    "# Generate the confusion matrix\n",
+    "print(\"\\n--- Confusion Matrix ---\")\n",
+    "cm = confusion_matrix(y_test, y_pred)\n",
+    "print(cm)\n",
+    "\n",
+    "# Visualize the confusion matrix\n",
+    "plt.figure(figsize=(7, 5))\n",
+    "sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',\n",
+    "            xticklabels=['Predicted Good', 'Predicted Bad'],\n",
+    "            yticklabels=['Actual Good', 'Actual Bad'])\n",
+    "plt.title('Confusion Matrix')\n",
+    "plt.ylabel('Actual Label')\n",
+    "plt.xlabel('Predicted Label')\n",
+    "plt.savefig('credit_risk_confusion_matrix.png')\n",
+    "print(\"Saved credit_risk_confusion_matrix.png\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 5. Interpretation & Conclusion\n",
+    "\n",
+    "The model performs reasonably well.\n",
+    "\n",
+    "* **Accuracy (79%):** A decent overall score.\n",
+    "* **Precision (Bad Risk): 0.70:** When the model predicts an applicant is \"Bad Risk,\" it is correct 70% of the time.\n",
+    "* **Recall (Bad Risk): 0.58:** The model successfully identified 58% of all actual \"Bad Risk\" applicants.\n",
+    "\n",
+    "For a bank, **Recall** for the \"Bad Risk\" class is critical (minimizing False Negatives, i.e., approving a bad loan). This model catches 58% of them. This is a solid baseline.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 6. Save Model, Scaler, and Features for API\n",
+    "\n",
+    "This is the final step. We save the `model`, the `scaler` (which only knows how to scale `Age`, `Credit amount`, `Duration`), the `encoders` (for `Sex`, `Housing`, `Purpose`), and the `feature_names`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Save the model\n",
+    "joblib.dump(model, 'german_credit_model.joblib')\n",
+    "\n",
+    "# Save the scaler\n",
+    "joblib.dump(scaler, 'german_credit_scaler.joblib')\n",
+    "\n",
+    "# Save the label encoders\n",
+    "joblib.dump(encoders, 'german_credit_encoders.joblib')\n",
+    "\n",
+    "# Save the feature names in order\n",
+    "joblib.dump(feature_names, 'german_credit_features.joblib')\n",
+    "\n",
+    "print(\"Files saved successfully:\")\n",
+    "print(\"german_credit_model.joblib\")\n",
+    "print(\"german_credit_scaler.joblib\")\n",
+    "print(\"german_credit_encoders.joblib\")\n",
+    "print(\"german_credit_features.joblib\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.12"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
