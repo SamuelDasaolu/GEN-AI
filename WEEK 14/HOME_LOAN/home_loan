@@ -1,0 +1,398 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 🏦 Home Loan Approval Prediction\n",
+    "\n",
+    "In this notebook, we will consolidate the EDA, cleaning, preprocessing, and modeling steps to build a machine learning model. The goal is to predict loan approval status (`Loan_Status`: Y/N) based on applicant details.\n",
+    "\n",
+    "To ensure a simple API backend, we will **use Label Encoding** for all categorical features, avoiding the complexity of One-Hot Encoding.\n",
+    "\n",
+    "1.  **Data Loading, EDA, and Cleaning**\n",
+    "2.  **Feature Engineering and Preprocessing**\n",
+    "3.  **Model Training and Evaluation**\n",
+    "4.  **Save Model and Artifacts** (for API deployment)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 1. Data Loading, EDA, and Cleaning\n",
+    "\n",
+    "First, we load the dataset and perform the necessary exploratory data analysis and cleaning."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn.preprocessing import StandardScaler, LabelEncoder\n",
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "from sklearn.metrics import classification_report, confusion_matrix\n",
+    "import joblib\n",
+    "import warnings\n",
+    "\n",
+    "# Suppress warnings for cleaner output\n",
+    "warnings.filterwarnings('ignore')\n",
+    "\n",
+    "# Set visualization style\n",
+    "sns.set(style=\"whitegrid\")\n",
+    "\n",
+    "# Load the dataset\n",
+    "url = \"https://raw.githubusercontent.com/ek-chris/Practice_datasets/refs/heads/main/home_loan_train.csv\"\n",
+    "loan_df = pd.read_csv(url)\n",
+    "\n",
+    "# Display the first few rows of the dataframe\n",
+    "print(\"--- Dataset Head ---\")\n",
+    "print(loan_df.head())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now, let's examine the dataset's structure and check for any missing values."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Get information about the dataframe\n",
+    "print(\"\\n--- Dataset Info ---\")\n",
+    "loan_df.info()\n",
+    "\n",
+    "# Check for missing values\n",
+    "print(\"\\n--- Missing Values Check ---\")\n",
+    "print(loan_df.isnull().sum())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Observation:** We have multiple columns with missing values. We will fill them using the mode (for categorical) and median (for numerical) as was done in the original notebook. `Loan_ID` will be dropped.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Cleaning Missing Values"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create a copy for processing\n",
+    "df_processed = loan_df.copy()\n",
+    "\n",
+    "# Fill categorical missing values with the mode\n",
+    "for col in ['Gender', 'Married', 'Dependents', 'Self_Employed']:\n",
+    "    df_processed[col] = df_processed[col].fillna(df_processed[col].mode()[0])\n",
+    "\n",
+    "# Fill numerical missing values with the median\n",
+    "for col in ['LoanAmount', 'Loan_Amount_Term']:\n",
+    "    df_processed[col] = df_processed[col].fillna(df_processed[col].median())\n",
+    "    \n",
+    "# Fill Credit_History with mode (it's categorical, 0 or 1)\n",
+    "df_processed['Credit_History'] = df_processed['Credit_History'].fillna(df_processed['Credit_History'].mode()[0])\n",
+    "\n",
+    "# Drop the ID column\n",
+    "df_processed = df_processed.drop('Loan_ID', axis=1)\n",
+    "\n",
+    "print(\"\\n--- Missing Values After Cleaning ---\")\n",
+    "print(df_processed.isnull().sum())"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Visualizing the Target Variable\n",
+    "\n",
+    "Let's see the distribution of our target variable, `Loan_Status`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Distribution of the target variable 'Loan_Status'\n",
+    "plt.figure(figsize=(6, 4))\n",
+    "sns.countplot(x='Loan_Status', data=df_processed, palette=\"viridis\")\n",
+    "plt.title('Distribution of Loan Status (Y=Approved, N=Rejected)')\n",
+    "plt.xlabel('Loan Status')\n",
+    "plt.ylabel('Count')\n",
+    "plt.savefig('loan_status_distribution.png')\n",
+    "print(\"Saved loan_status_distribution.png\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Observation:** The dataset is **imbalanced**. There are significantly more \"Approved\" (Y) cases than \"Rejected\" (N). We will use `class_weight='balanced'` in our model.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 2. Feature Engineering & Preprocessing\n",
+    "\n",
+    "To keep the API simple, we will `LabelEncode` all `object` columns."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Map target variable\n",
+    "df_processed['Loan_Status'] = df_processed['Loan_Status'].map({'N': 0, 'Y': 1})\n",
+    "\n",
+    "# Identify categorical columns for encoding\n",
+    "categorical_cols = df_processed.select_dtypes(include=['object']).columns\n",
+    "\n",
+    "# Label Encoding for all categorical features\n",
+    "# We will save these encoders for the API\n",
+    "encoders = {}\n",
+    "for col in categorical_cols:\n",
+    "    le = LabelEncoder()\n",
+    "    df_processed[col] = le.fit_transform(df_processed[col])\n",
+    "    encoders[col] = le\n",
+    "\n",
+    "print(\"--- Processed Data Head ---\")\n",
+    "print(df_processed.head())\n",
+    "\n",
+    "print(\"\\n--- Processed Data Info ---\")\n",
+    "df_processed.info()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Observation:** All columns are now numeric and ready for scaling and modeling.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "#### Splitting and Scaling the Data\n",
+    "\n",
+    "We will split the data for evaluation and scale the numerical features."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Define features (X) and target (y)\n",
+    "X = df_processed.drop('Loan_Status', axis=1)\n",
+    "y = df_processed['Loan_Status']\n",
+    "\n",
+    "# Save feature names for the API\n",
+    "feature_names = list(X.columns)\n",
+    "\n",
+    "# Split the data for evaluation\n",
+    "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)\n",
+    "\n",
+    "# Identify numeric columns (non-encoded)\n",
+    "numeric_cols = ['ApplicantIncome', 'CoapplicantIncome', 'LoanAmount', 'Loan_Amount_Term']\n",
+    "\n",
+    "# Scale numeric features\n",
+    "scaler = StandardScaler()\n",
+    "\n",
+    "# Fit on training data\n",
+    "X_train[numeric_cols] = scaler.fit_transform(X_train[numeric_cols])\n",
+    "\n",
+    "# Transform test data\n",
+    "X_test[numeric_cols] = scaler.transform(X_test[numeric_cols])\n",
+    "\n",
+    "print(f\"Training set shape: {X_train.shape}\")\n",
+    "print(f\"Test set shape: {X_test.shape}\")\n",
+    "print(\"Data scaling complete.\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 3. Model Training and Evaluation\n",
+    "\n",
+    "We'll use `RandomForestClassifier` with `class_weight='balanced'` to handle the data imbalance."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Initialize the model\n",
+    "model = RandomForestClassifier(random_state=42, class_weight='balanced')\n",
+    "\n",
+    "# Train the model\n",
+    "print(\"Training the evaluation model...\")\n",
+    "model.fit(X_train, y_train)\n",
+    "print(\"Model training complete.\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Now, let's evaluate this model's performance on the unseen test data."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Make predictions on the test set\n",
+    "y_pred = model.predict(X_test)\n",
+    "\n",
+    "# Generate the classification report\n",
+    "print(\"\\n--- Classification Report ---\")\n",
+    "print(classification_report(y_test, y_pred, target_names=['Rejected (0)', 'Approved (1)']))\n",
+    "\n",
+    "# Generate the confusion matrix\n",
+    "print(\"\\n--- Confusion Matrix ---\")\n",
+    "cm = confusion_matrix(y_test, y_pred)\n",
+    "print(cm)\n",
+    "\n",
+    "# Visualize the confusion matrix\n",
+    "plt.figure(figsize=(7, 5))\n",
+    "sns.heatmap(cm, annot=True, fmt='d', cmap='Greens',\n",
+    "            xticklabels=['Predicted Rejected', 'Predicted Approved'],\n",
+    "            yticklabels=['Actual Rejected', 'Actual Approved'])\n",
+    "plt.title('Confusion Matrix')\n",
+    "plt.ylabel('Actual Label')\n",
+    "plt.xlabel('Predicted Label')\n",
+    "plt.savefig('loan_status_confusion_matrix.png')\n",
+    "print(\"Saved loan_status_confusion_matrix.png\")\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 4. Interpretation & Conclusion\n",
+    "\n",
+    "The model performs reasonably well.\n",
+    "\n",
+    "* **Accuracy (78%):** A good overall score.\n",
+    "* **Precision (Rejected): 0.67:** When the model predicts \"Rejected,\" it is correct 67% of the time.\n",
+    "* **Recall (Rejected): 0.53:** The model successfully identified 53% of all actual \"Rejected\" applications. This is the main weakness, as it means 47% of \"Rejected\" cases were misclassified as \"Approved\" (False Positives: 18).\n",
+    "\n",
+    "For a bank, these **False Positives (18)** are the most critical error (approving a bad loan). The **False Negatives (9)** (rejecting a good loan) are a missed business opportunity but less risky. The model is a solid baseline, but reducing False Positives would be the next priority.\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### 5. Save Model and Artifacts for API\n",
+    "\n",
+    "This is the final step. We will **re-train the model and scaler on 100% of the data** to make them as robust as possible for the API."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# --- Re-training on 100% of the data for final API model ---\n",
+    "\n",
+    "print(\"\\n--- Re-training final model on all data ---\")\n",
+    "\n",
+    "# 1. Re-fit the scaler on ALL of X\n",
+    "final_scaler = StandardScaler()\n",
+    "X[numeric_cols] = final_scaler.fit_transform(X[numeric_cols])\n",
+    "\n",
+    "# 2. Re-fit the model on ALL of X and y\n",
+    "final_model = RandomForestClassifier(random_state=42, class_weight='balanced')\n",
+    "final_model.fit(X, y)\n",
+    "\n",
+    "print(\"Final model and scaler are re-trained on 100% of the data.\")\n",
+    "\n",
+    "# --- Save the final artifacts ---\n",
+    "\n",
+    "# Save the model\n",
+    "joblib.dump(final_model, 'home_loan_model.joblib')\n",
+    "\n",
+    "# Save the scaler\n",
+    "joblib.dump(final_scaler, 'home_loan_scaler.joblib')\n",
+    "\n",
+    "# Save the label encoders\n",
+    "joblib.dump(encoders, 'home_loan_encoders.joblib')\n",
+    "\n",
+    "# Save the feature names in order\n",
+    "joblib.dump(feature_names, 'home_loan_features.joblib')\n",
+    "\n",
+    "print(\"Files saved successfully:\")\n",
+    "print(\"home_loan_model.joblib\")\n",
+    "print(\"home_loan_scaler.joblib\")\n",
+    "print(\"home_loan_encoders.joblib\")\n",
+    "print(\"home_loan_features.joblib\")"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "Python 3 (ipykernel)",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.10.12"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
