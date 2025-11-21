@@ -3,3 +3,4 @@ __pycache__/
 TASKS/Dasaolu_Samuel_task19/crimes.csv
 data_files/
 WEEK 11/BACKEND/.env
+.env
