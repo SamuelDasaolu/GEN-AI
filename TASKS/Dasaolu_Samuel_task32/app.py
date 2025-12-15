@@ -1,14 +1,13 @@
 import streamlit as st
 import os
-import tempfile
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_classic.chains import create_retrieval_chain
+from langchain_classic.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.documents import Document
 
 # --- Page Config ---
 st.set_page_config(page_title="Interactive Biography RAG", page_icon="👤")
@@ -21,136 +20,147 @@ with st.sidebar:
     st.header("1. Setup")
     api_key = st.text_input("Google API Key", type="password")
     st.markdown("[Get a Google API Key](https://aistudio.google.com/app/apikey)")
-    
+
     st.divider()
-    
+
     st.header("2. Knowledge Base")
     uploaded_file = st.file_uploader("Upload Biography (.txt)", type="txt")
-    
-    # Use default biography.txt if no file uploaded
-    if not uploaded_file and os.path.exists("biography.txt"):
-        st.info("Using default 'biography.txt'. Upload a new file to override.")
 
-# --- RAG Functions ---
+    if st.button("Clear Chat History"):
+        st.session_state.messages = []
+        st.rerun()
 
-@st.cache_resource(ttl="1h")
-def build_vector_store(file_path, _api_key):
+
+# --- Helper Functions ---
+
+def get_text_content(uploaded_file):
     """
-    Builds the FAISS vector store from a text file.
-    Cached to prevent rebuilding on every interaction.
+    Robust function to read text from uploaded file or local file.
     """
     try:
-        # 1. Load the document
-        loader = TextLoader(file_path)
-        docs = loader.load()
+        if uploaded_file:
+            # Use getvalue() to read bytes without moving the cursor,
+            # ensuring it works across reruns.
+            return uploaded_file.getvalue().decode("utf-8")
+        elif os.path.exists("biography.txt"):
+            # Read local file
+            with open("biography.txt", "r", encoding="utf-8") as f:
+                return f.read()
+    except Exception as e:
+        st.error(f"Error reading file: {e}")
+        return None
+    return None
 
-        # 2. Split text into chunks
-        # Biographies often have dense paragraphs, so we use a reasonable chunk size
+
+@st.cache_resource(show_spinner=False)
+def build_vector_store(text_content, _api_key):
+    """
+    Builds the FAISS vector store from raw text content.
+    """
+    if not text_content:
+        return None
+
+    try:
+        # 1. Create a Document object directly (bypassing file loaders)
+        docs = [Document(page_content=text_content, metadata={"source": "biography"})]
+
+        # 2. Split text
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         splits = text_splitter.split_documents(docs)
 
         # 3. Create Embeddings
-        # We explicitly pass the API key here to ensure it works even if env var isn't set globally
         embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001", 
+            model="models/embedding-001",
             google_api_key=_api_key
         )
 
-        # 4. Build FAISS Index
+        # 4. Build Index
         vectorstore = FAISS.from_documents(documents=splits, embedding=embeddings)
         return vectorstore
 
     except Exception as e:
-        st.error(f"Error processing document: {e}")
+        st.error(f"Error creating vector store: {e}")
         return None
 
+
 def get_rag_chain(vectorstore, _api_key):
-    """
-    Creates the retrieval chain.
-    """
-    llm = ChatGoogleGenerativeAI(
-        model="gemini-1.5-flash", 
-        temperature=0.3,
-        google_api_key=_api_key
-    )
+    try:
+        llm = ChatGoogleGenerativeAI(
+            model="gemini-2.0-flash",
+            temperature=0.3,
+            google_api_key=_api_key,
+            convert_system_message_to_human=True  # Helps with some specific error types
+        )
 
-    system_prompt = (
-        "You are an AI assistant representing the person described in the context. "
-        "Answer questions as if you are that person, or an expert biographer. "
-        "Use the following pieces of retrieved context to answer the question. "
-        "If the answer is not in the context, clearly state that the biography does not contain that information. "
-        "Keep answers concise and relevant."
-        "\n\n"
-        "{context}"
-    )
+        system_prompt = (
+            "You are an AI assistant representing the person described in the context. "
+            "Answer questions as if you are that person. "
+            "Use the following pieces of retrieved context to answer the question. "
+            "If the answer is not in the context, say you don't know based on the biography. "
+            "\n\n"
+            "{context}"
+        )
 
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", system_prompt),
-            ("human", "{input}"),
-        ]
-    )
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                ("system", system_prompt),
+                ("human", "{input}"),
+            ]
+        )
 
-    retriever = vectorstore.as_retriever()
-    question_answer_chain = create_stuff_documents_chain(llm, prompt)
-    rag_chain = create_retrieval_chain(retriever, question_answer_chain)
-    
-    return rag_chain
+        retriever = vectorstore.as_retriever()
+        question_answer_chain = create_stuff_documents_chain(llm, prompt)
+        rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+        return rag_chain
+    except Exception as e:
+        st.error(f"Error creating chain: {e}")
+        return None
+
 
 # --- Main Logic ---
 
-if not api_key:
-    st.warning("Please enter your Google API Key in the sidebar to start.")
-    st.stop()
+def main():
+    if not api_key:
+        st.warning("Please enter your Google API Key in the sidebar to start.")
+        return
 
-# Handle File Loading
-file_path = "biography.txt" # Default
-temp_file = None
+    # 1. Get Text Content
+    text_content = get_text_content(uploaded_file)
 
-if uploaded_file:
-    # Save uploaded file to a temporary path
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".txt") as tmp:
-        tmp.write(uploaded_file.getvalue())
-        file_path = tmp.name
-        temp_file = file_path # Mark for cleanup
+    if not text_content:
+        st.info("Please upload a .txt file or create a 'biography.txt' file in the app directory.")
+        return
 
-# Check if file exists
-if not os.path.exists(file_path):
-    st.error("No biography file found. Please upload a .txt file or create 'biography.txt'.")
-    st.stop()
+    # 2. Build Vector Store
+    with st.spinner("Processing biography..."):
+        vectorstore = build_vector_store(text_content, api_key)
 
-# Initialize Chat History
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+    # 3. Chat Interface
+    if vectorstore:
+        rag_chain = get_rag_chain(vectorstore, api_key)
 
-# Build Vector Store
-with st.spinner("Processing biography..."):
-    vectorstore = build_vector_store(file_path, api_key)
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
 
-if vectorstore:
-    rag_chain = get_rag_chain(vectorstore, api_key)
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    # Display Chat
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+        if prompt := st.chat_input("Ask me anything about my life..."):
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
 
-    # User Input
-    if prompt := st.chat_input("Ask about the biography..."):
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.markdown(prompt)
+            with st.chat_message("assistant"):
+                with st.spinner("Thinking..."):
+                    try:
+                        response = rag_chain.invoke({"input": prompt})
+                        answer = response['answer']
+                        st.markdown(answer)
+                        st.session_state.messages.append({"role": "assistant", "content": answer})
+                    except Exception as e:
+                        st.error(f"An error occurred during generation: {e}")
 
-        with st.chat_message("assistant"):
-            with st.spinner("Thinking..."):
-                response = rag_chain.invoke({"input": prompt})
-                answer = response['answer']
-                st.markdown(answer)
-                st.session_state.messages.append({"role": "assistant", "content": answer})
 
-# Cleanup temp file if used
-if temp_file and os.path.exists(temp_file):
-    try:
-        os.remove(temp_file)
-    except:
-        pass
+if __name__ == "__main__":
+    main()
