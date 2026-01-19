@@ -1,0 +1,4 @@
+cat /proc/mounts | grep .emu
+ls -la ~ ## all hidden filders
+rm -rf ~/.cache/* ## clear cache
+df -h . ## check space left on device
